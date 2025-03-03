@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamický generátor textu</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Overlock+SC&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background-color: black;
+        color: white;
+        font-family: "Overlock SC", cursive;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .container {
+        width: 100%;
+        max-width: 700px;
+      }
+      .input-area {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+        background-color: #111;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      input {
+        padding: 10px;
+        font-family: "Overlock SC", cursive;
+        background-color: #333;
+        color: white;
+        border: 1px solid #555;
+        margin-bottom: 10px;
+        width: 100%;
+      }
+      .controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      button {
+        padding: 10px 15px;
+        background-color: #555;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-family: "Overlock SC", cursive;
+      }
+      button:disabled {
+        background-color: #333;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .word-count,
+      .progress,
+      .structure-info {
+        font-size: 14px;
+        margin-right: 15px;
+      }
+      .progress-bar {
+        width: 100%;
+        background-color: #333;
+        height: 10px;
+        margin-top: 10px;
+        border-radius: 5px;
+      }
+      .progress-fill {
+        height: 100%;
+        background-color: #4caf50;
+        border-radius: 5px;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+      .output-area {
+        margin-top: 10px;
+        line-height: 1.1;
+      }
+      .paragraph {
+        margin-bottom: 15px;
+      }
+      .word-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 5px;
+      }
+      .word {
+        margin-right: 10px;
+      }
+      .structure-display {
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: #222;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Dynamický generátor textu</h1>
+
+      <div class="structure-display" id="structureDisplay">
+        Generování struktury...
+      </div>
+
+      <div class="input-area">
+        <input type="text" id="textInput" placeholder="Zadejte 3-6 slov..." />
+        <div class="controls">
+          <div>
+            <span class="word-count"
+              >Počet slov: <span id="counter">0</span></span
+            >
+            <span class="progress"
+              >Hotovo: <span id="progressText">0%</span></span
+            >
+          </div>
+          <button id="submitBtn" disabled>Odeslat</button>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <div class="output-area" id="outputArea"></div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const textInput = document.getElementById("textInput");
+        const counter = document.getElementById("counter");
+        const submitBtn = document.getElementById("submitBtn");
+        const outputArea = document.getElementById("outputArea");
+        const progressText = document.getElementById("progressText");
+        const progressFill = document.getElementById("progressFill");
+        const structureDisplay = document.getElementById("structureDisplay");
+
+        // Generování náhodné struktury
+        const paragraphCount = getRandomInt(3, 6);
+        let structure = [];
+        let totalWords = 0;
+        let addedWords = 0;
+
+        // Vytvoření struktury
+        for (let p = 0; p < paragraphCount; p++) {
+          const rowsInParagraph = getRandomInt(2, 4); // Náhodný počet řádků v odstavci
+          const paragraph = [];
+
+          for (let r = 0; r < rowsInParagraph; r++) {
+            const wordsInRow = getRandomInt(4, 6); // Náhodný počet slov na řádek (4-6)
+            paragraph.push(wordsInRow);
+            totalWords += wordsInRow;
+          }
+
+          structure.push(paragraph);
+        }
+
+        // Zobrazení informací o struktuře
+        displayStructureInfo();
+
+        // Aktualizace počítadla při psaní
+        textInput.addEventListener("input", function () {
+          const words = textInput.value
+            .trim()
+            .split(/\s+/)
+            .filter((word) => word.length > 0);
+          const count = words.length;
+          counter.textContent = count;
+
+          // Povolení tlačítka pouze pokud je zadáno 3-6 slov
+          submitBtn.disabled = !(count >= 3 && count <= 6);
+        });
+
+        // Přidání textu po odeslání
+        submitBtn.addEventListener("click", function () {
+          const words = textInput.value
+            .trim()
+            .split(/\s+/)
+            .filter((word) => word.length > 0);
+
+          if (words.length >= 3 && words.length <= 6) {
+            addWordsToStructure(words);
+            updateProgress();
+
+            // Vyčištění formuláře
+            textInput.value = "";
+            counter.textContent = "0";
+            submitBtn.disabled = true;
+          }
+        });
+
+        // Povolení odeslání pomocí klávesy Enter
+        textInput.addEventListener("keypress", function (e) {
+          if (e.key === "Enter" && !submitBtn.disabled) {
+            submitBtn.click();
+          }
+        });
+
+        // Funkce pro zobrazení informací o struktuře
+        function displayStructureInfo() {
+          let structureInfo = `Struktura: ${paragraphCount} odstavců, celkem ${totalWords} slov<br>`;
+
+          for (let p = 0; p < structure.length; p++) {
+            structureInfo += `Odstavec ${p + 1}: `;
+            for (let r = 0; r < structure[p].length; r++) {
+              structureInfo += `${structure[p][r]} slov`;
+              if (r < structure[p].length - 1) structureInfo += ", ";
+            }
+            structureInfo += "<br>";
+          }
+
+          structureDisplay.innerHTML = structureInfo;
+        }
+
+        // Funkce pro přidání slov do struktury
+        function addWordsToStructure(words) {
+          let wordIndex = 0;
+
+          while (wordIndex < words.length && addedWords < totalWords) {
+            // Najít aktuální pozici ve struktuře
+            let currentP = 0;
+            let currentR = 0;
+            let currentW = 0;
+            let wordCount = 0;
+
+            // Projít strukturu, dokud nenajdeme správné místo pro další slovo
+            outerLoop: for (let p = 0; p < structure.length; p++) {
+              for (let r = 0; r < structure[p].length; r++) {
+                if (wordCount + structure[p][r] > addedWords) {
+                  currentP = p;
+                  currentR = r;
+                  currentW = addedWords - wordCount;
+                  break outerLoop;
+                }
+                wordCount += structure[p][r];
+              }
+            }
+
+            // Zkontrolovat, zda odstavec již existuje
+            let paragraph = outputArea.children[currentP];
+            if (!paragraph) {
+              paragraph = document.createElement("div");
+              paragraph.className = "paragraph";
+              outputArea.appendChild(paragraph);
+            }
+
+            // Zkontrolovat, zda řádek již existuje
+            let row = paragraph.children[currentR];
+            if (!row) {
+              row = document.createElement("div");
+              row.className = "word-row";
+              paragraph.appendChild(row);
+            }
+
+            // Přidat slovo
+            const wordElement = document.createElement("span");
+            wordElement.className = "word";
+            wordElement.textContent = words[wordIndex];
+            row.appendChild(wordElement);
+
+            wordIndex++;
+            addedWords++;
+          }
+        }
+
+        // Funkce pro aktualizaci postupu
+        function updateProgress() {
+          const percentage = Math.floor((addedWords / totalWords) * 100);
+          progressText.textContent = `${percentage}%`;
+          progressFill.style.width = `${percentage}%`;
+        }
+
+        // Pomocná funkce pro získání náhodného celého čísla v rozsahu
+        function getRandomInt(min, max) {
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+      });
+    </script>
+  </body>
+</html>
