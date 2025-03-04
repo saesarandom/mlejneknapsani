@@ -13,7 +13,7 @@
         background-color: black;
         color: white;
         font-family: "Overlock SC", cursive;
-        padding: 10px;
+        padding: 20px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -27,7 +27,7 @@
         flex-direction: column;
         margin-bottom: 20px;
         background-color: #111;
-        padding: 10px;
+        padding: 15px;
         border-radius: 5px;
       }
       input {
@@ -43,6 +43,12 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-wrap: wrap;
+      }
+      .controls-left {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
       }
       button {
         padding: 10px 15px;
@@ -78,8 +84,25 @@
         transition: width 0.3s ease;
       }
       .output-area {
-        margin-top: 10px;
+        margin-top: 20px;
         line-height: 1.1;
+      }
+      .text-container {
+        margin-bottom: 30px;
+        padding: 15px;
+        background-color: #111;
+        border-radius: 5px;
+        position: relative;
+      }
+      .text-container::after {
+        content: "";
+        display: block;
+        height: 2px;
+        background: #333;
+        margin-top: 15px;
+      }
+      .text-container:last-child::after {
+        display: none;
       }
       .paragraph {
         margin-bottom: 15px;
@@ -87,22 +110,71 @@
       .word-row {
         display: flex;
         flex-wrap: wrap;
-        margin-bottom: 5px;
+        margin-bottom: 0px;
       }
       .word {
-        margin-right: 10px;
+        margin-right: 4px;
       }
       .structure-display {
-        margin-bottom: 10px;
+        margin-bottom: 15px;
         padding: 10px;
         background-color: #222;
         border-radius: 5px;
+      }
+      .timestamp {
+        font-size: 12px;
+        color: #888;
+        text-align: right;
+        margin-top: 10px;
+      }
+      .clear-button {
+        margin-top: 20px;
+        background-color: #a83232;
+      }
+      .mode-selector {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #222;
+        border-radius: 5px;
+      }
+      .mode-button {
+        padding: 8px 12px;
+        border-radius: 5px;
+        background-color: #333;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .mode-button.active {
+        background-color: #4caf50;
+      }
+      .mode-description {
+        font-size: 14px;
+        text-align: center;
+        margin-top: 10px;
+        color: #aaa;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Dynamický generátor textu</h1>
+
+      <div class="mode-selector">
+        <button id="standardModeBtn" class="mode-button active">
+          Standardní režim
+        </button>
+        <button id="paragraphModeBtn" class="mode-button">
+          Odstavcový režim
+        </button>
+      </div>
+
+      <div class="mode-description" id="modeDescription">
+        Standardní režim: Zadávejte 3-6 slov, odstavce mají náhodnou strukturu
+        (4-6 slov na řádek)
+      </div>
 
       <div class="structure-display" id="structureDisplay">
         Generování struktury...
@@ -111,7 +183,7 @@
       <div class="input-area">
         <input type="text" id="textInput" placeholder="Zadejte 3-6 slov..." />
         <div class="controls">
-          <div>
+          <div class="controls-left">
             <span class="word-count"
               >Počet slov: <span id="counter">0</span></span
             >
@@ -127,6 +199,8 @@
       </div>
 
       <div class="output-area" id="outputArea"></div>
+
+      <button id="clearBtn" class="clear-button">Vymazat všechny texty</button>
     </div>
 
     <script>
@@ -138,29 +212,81 @@
         const progressText = document.getElementById("progressText");
         const progressFill = document.getElementById("progressFill");
         const structureDisplay = document.getElementById("structureDisplay");
+        const clearBtn = document.getElementById("clearBtn");
+        const standardModeBtn = document.getElementById("standardModeBtn");
+        const paragraphModeBtn = document.getElementById("paragraphModeBtn");
+        const modeDescription = document.getElementById("modeDescription");
+        loadSavedTexts();
+        loadStateForMode(currentMode);
 
-        // Generování náhodné struktury
-        const paragraphCount = getRandomInt(3, 6);
+        // Mode variables
+        let currentMode = "standard"; // 'standard' or 'paragraph'
+        let minWordsInput = 3;
+        let maxWordsInput = 6;
+
+        // Data struktury
+        let paragraphCount = 0;
         let structure = [];
         let totalWords = 0;
         let addedWords = 0;
+        let currentTextId = "";
 
-        // Vytvoření struktury
-        for (let p = 0; p < paragraphCount; p++) {
-          const rowsInParagraph = getRandomInt(2, 4); // Náhodný počet řádků v odstavci
-          const paragraph = [];
+        // Přepínání režimů
+        standardModeBtn.addEventListener("click", function () {
+          setMode("standard");
+        });
 
-          for (let r = 0; r < rowsInParagraph; r++) {
-            const wordsInRow = getRandomInt(4, 6); // Náhodný počet slov na řádek (4-6)
-            paragraph.push(wordsInRow);
-            totalWords += wordsInRow;
+        paragraphModeBtn.addEventListener("click", function () {
+          setMode("paragraph");
+        });
+
+        // Funkce pro nastavení režimu
+        function setMode(mode) {
+          // Uložit aktuální stav před přepnutím režimu
+          if (currentTextId) {
+            saveCurrentState();
           }
 
-          structure.push(paragraph);
+          currentMode = mode;
+
+          // Update UI
+          if (mode === "standard") {
+            standardModeBtn.classList.add("active");
+            paragraphModeBtn.classList.remove("active");
+            modeDescription.textContent =
+              "Standardní režim: Zadávejte 3-6 slov, odstavce mají náhodnou strukturu (4-6 slov na řádek)";
+            textInput.placeholder = "Zadejte 3-6 slov...";
+            minWordsInput = 3;
+            maxWordsInput = 6;
+          } else {
+            standardModeBtn.classList.remove("active");
+            paragraphModeBtn.classList.add("active");
+            modeDescription.textContent =
+              "Odstavcový režim: Zadávejte 30-60 slov, odstavce mají 90-180 slov";
+            textInput.placeholder = "Zadejte 30-60 slov...";
+            minWordsInput = 30;
+            maxWordsInput = 60;
+          }
+
+          // Reset input
+          textInput.value = "";
+          counter.textContent = "0";
+          submitBtn.disabled = true;
+
+          // Načíst stav pro tento režim
+          loadStateForMode(mode);
+
+          // Inicializovat novou strukturu pro vybraný režim pouze pokud je požadováno
+          if (createNewStructure) {
+            initNewStructure();
+          }
         }
 
-        // Zobrazení informací o struktuře
-        displayStructureInfo();
+        // Load saved texts from localStorage
+        loadSavedTexts();
+
+        // Inicializace nové struktury
+        initNewStructure();
 
         // Aktualizace počítadla při psaní
         textInput.addEventListener("input", function () {
@@ -171,8 +297,10 @@
           const count = words.length;
           counter.textContent = count;
 
-          // Povolení tlačítka pouze pokud je zadáno 3-6 slov
-          submitBtn.disabled = !(count >= 3 && count <= 6);
+          // Povolení tlačítka pouze pokud je zadán správný počet slov pro aktuální režim
+          submitBtn.disabled = !(
+            count >= minWordsInput && count <= maxWordsInput
+          );
         });
 
         // Přidání textu po odeslání
@@ -182,14 +310,25 @@
             .split(/\s+/)
             .filter((word) => word.length > 0);
 
-          if (words.length >= 3 && words.length <= 6) {
-            addWordsToStructure(words);
+          if (words.length >= minWordsInput && words.length <= maxWordsInput) {
+            if (currentMode === "standard") {
+              addWordsToStructureStandard(words);
+            } else {
+              addWordsToStructureParagraph(words);
+            }
+
             updateProgress();
+            saveCurrentText();
 
             // Vyčištění formuláře
             textInput.value = "";
             counter.textContent = "0";
             submitBtn.disabled = true;
+
+            // Pokud je text dokončen, začít nový
+            if (addedWords >= totalWords) {
+              initNewStructure();
+            }
           }
         });
 
@@ -200,25 +339,247 @@
           }
         });
 
+        // Vymazání všech textů
+        clearBtn.addEventListener("click", function () {
+          if (confirm("Opravdu chcete vymazat všechny uložené texty?")) {
+            localStorage.removeItem("savedTexts");
+            outputArea.innerHTML = "";
+            initNewStructure();
+          }
+        });
+
+        function saveCurrentState() {
+          // Uložit stav aktuálního režimu
+          localStorage.setItem(`currentTextId_${currentMode}`, currentTextId);
+          localStorage.setItem(
+            `structure_${currentMode}`,
+            JSON.stringify(structure)
+          );
+          localStorage.setItem(`addedWords_${currentMode}`, addedWords);
+          localStorage.setItem(`totalWords_${currentMode}`, totalWords);
+          localStorage.setItem(`paragraphCount_${currentMode}`, paragraphCount);
+
+          // Uložit text do localStorage, pokud existuje
+          if (currentTextId) {
+            let savedTexts = JSON.parse(
+              localStorage.getItem("savedTexts") || "{}"
+            );
+            const textContainer = document.getElementById(currentTextId);
+
+            if (textContainer) {
+              savedTexts[currentTextId] = {
+                mode: currentMode,
+                structure: structure,
+                addedWords: addedWords,
+                totalWords: totalWords,
+                html: textContainer.innerHTML,
+                timestamp: new Date().toLocaleString(),
+              };
+
+              localStorage.setItem("savedTexts", JSON.stringify(savedTexts));
+            }
+          }
+        }
+
+        // Přidejte funkci pro načtení stavu pro konkrétní režim
+        function loadStateForMode(mode) {
+          // Načíst stav pro daný režim
+          const textId = localStorage.getItem(`currentTextId_${mode}`);
+          const savedTexts = JSON.parse(
+            localStorage.getItem("savedTexts") || "{}"
+          );
+
+          // Zkontrolovat, zda existuje rozpracovaný text pro tento režim
+          if (textId && savedTexts[textId]) {
+            // Obnovit stav
+            currentTextId = textId;
+            structure = JSON.parse(
+              localStorage.getItem(`structure_${mode}`) || "[]"
+            );
+            addedWords = parseInt(
+              localStorage.getItem(`addedWords_${mode}`) || "0"
+            );
+            totalWords = parseInt(
+              localStorage.getItem(`totalWords_${mode}`) || "0"
+            );
+            paragraphCount = parseInt(
+              localStorage.getItem(`paragraphCount_${mode}`) || "0"
+            );
+
+            // Zkontrolovat, zda je text dokončen
+            if (addedWords >= totalWords) {
+              // Pokud je dokončen, vytvořit nový
+              initNewStructure();
+            } else {
+              // Jinak zobrazit existující
+              displayStructureInfo();
+              updateProgress();
+
+              // Zkontrolovat, zda kontejner pro text existuje
+              let textContainer = document.getElementById(currentTextId);
+              if (!textContainer) {
+                // Vytvořit kontejner a načíst HTML
+                createNewTextContainer();
+                document.getElementById(currentTextId).innerHTML =
+                  savedTexts[textId].html;
+              }
+            }
+          } else {
+            // Vytvořit novou strukturu pro tento režim
+            initNewStructure();
+          }
+        }
+
+        // Funkce pro inicializaci nové struktury
+        // Upravte funkci initNewStructure takto:
+        function initNewStructure() {
+          // Kontrola, zda existuje rozpracovaný text
+          const savedTexts = JSON.parse(
+            localStorage.getItem("savedTexts") || "{}"
+          );
+          const unfinishedTextId = localStorage.getItem("currentTextId");
+
+          // Pokud existuje rozpracovaný text, načteme jeho stav místo vytvoření nového
+          if (
+            unfinishedTextId &&
+            savedTexts[unfinishedTextId] &&
+            savedTexts[unfinishedTextId].addedWords <
+              savedTexts[unfinishedTextId].totalWords
+          ) {
+            const unfinishedText = savedTexts[unfinishedTextId];
+
+            // Nastavíme aktuální režim podle uloženého textu
+            setMode(unfinishedText.mode, false); // false znamená, že nechceme vytvářet novou strukturu
+
+            // Obnovíme všechny hodnoty z uloženého textu
+            currentTextId = "text_" + Date.now();
+
+            structure = unfinishedText.structure;
+            addedWords = unfinishedText.addedWords;
+            totalWords = unfinishedText.totalWords;
+            paragraphCount =
+              currentMode === "standard" ? structure.length : structure.length;
+
+            // Zobrazení informací o struktuře
+            displayStructureInfo();
+
+            // Kontrola, zda kontejner pro text už existuje
+            let textContainer = document.getElementById(currentTextId);
+            if (!textContainer) {
+              createNewTextContainer();
+              document.getElementById(currentTextId).innerHTML =
+                unfinishedText.html;
+            }
+
+            // Aktualizace progress baru
+            updateProgress();
+
+            console.log("Pokračování v nedokončeném textu:", currentTextId);
+          } else {
+            // Pokud neexistuje rozpracovaný text, vytvoříme nový
+            currentTextId = "text_" + Date.now();
+            localStorage.setItem("currentTextId", currentTextId);
+
+            // Resetování počítadel
+            addedWords = 0;
+            totalWords = 0;
+
+            if (currentMode === "standard") {
+              initStandardStructure();
+            } else {
+              initParagraphStructure();
+            }
+
+            // Zobrazení informací o struktuře
+            displayStructureInfo();
+
+            // Vytvoření nového kontejneru pro text
+            createNewTextContainer();
+
+            // Reset progress
+            updateProgress();
+            saveCurrentState();
+            console.log("Vytvořen nový text:", currentTextId);
+          }
+        }
+
+        // Inicializace struktury pro standardní režim
+        function initStandardStructure() {
+          paragraphCount = getRandomInt(3, 6);
+          structure = [];
+
+          // Vytvoření struktury
+          for (let p = 0; p < paragraphCount; p++) {
+            const rowsInParagraph = getRandomInt(2, 4); // Náhodný počet řádků v odstavci
+            const paragraph = [];
+
+            for (let r = 0; r < rowsInParagraph; r++) {
+              const wordsInRow = getRandomInt(4, 6); // Náhodný počet slov na řádek (4-6)
+              paragraph.push(wordsInRow);
+              totalWords += wordsInRow;
+            }
+
+            structure.push(paragraph);
+          }
+        }
+
+        // Inicializace struktury pro odstavcový režim
+        function initParagraphStructure() {
+          paragraphCount = getRandomInt(6, 12);
+          structure = [];
+
+          // Vytvoření struktury s velkými odstavci
+          for (let p = 0; p < paragraphCount; p++) {
+            const wordsInParagraph = getRandomInt(90, 180); // Náhodný počet slov v odstavci (90-180)
+            structure.push(wordsInParagraph);
+            totalWords += wordsInParagraph;
+          }
+        }
+
         // Funkce pro zobrazení informací o struktuře
         function displayStructureInfo() {
-          let structureInfo = `Struktura: ${paragraphCount} odstavců, celkem ${totalWords} slov<br>`;
+          let structureInfo = "";
 
-          for (let p = 0; p < structure.length; p++) {
-            structureInfo += `Odstavec ${p + 1}: `;
-            for (let r = 0; r < structure[p].length; r++) {
-              structureInfo += `${structure[p][r]} slov`;
-              if (r < structure[p].length - 1) structureInfo += ", ";
+          if (currentMode === "standard") {
+            structureInfo = `Struktura: ${paragraphCount} odstavců, celkem ${totalWords} slov<br>`;
+
+            for (let p = 0; p < structure.length; p++) {
+              structureInfo += `Odstavec ${p + 1}: `;
+              for (let r = 0; r < structure[p].length; r++) {
+                structureInfo += `${structure[p][r]} slov`;
+                if (r < structure[p].length - 1) structureInfo += ", ";
+              }
+              structureInfo += "<br>";
             }
-            structureInfo += "<br>";
+          } else {
+            structureInfo = `Struktura: ${paragraphCount} odstavců, celkem ${totalWords} slov<br>`;
+
+            for (let p = 0; p < structure.length; p++) {
+              structureInfo += `Odstavec ${p + 1}: ${structure[p]} slov<br>`;
+            }
           }
 
           structureDisplay.innerHTML = structureInfo;
         }
 
-        // Funkce pro přidání slov do struktury
-        function addWordsToStructure(words) {
+        // Funkce pro vytvoření nového kontejneru pro text
+        function createNewTextContainer() {
+          const textContainer = document.createElement("div");
+          textContainer.className = "text-container";
+          textContainer.id = currentTextId;
+
+          const timestamp = document.createElement("div");
+          timestamp.className = "timestamp";
+          timestamp.textContent = new Date().toLocaleString();
+
+          textContainer.appendChild(timestamp);
+          outputArea.prepend(textContainer);
+        }
+
+        // Funkce pro přidání slov do struktury v standardním režimu
+        function addWordsToStructureStandard(words) {
           let wordIndex = 0;
+          const textContainer = document.getElementById(currentTextId);
 
           while (wordIndex < words.length && addedWords < totalWords) {
             // Najít aktuální pozici ve struktuře
@@ -241,18 +602,22 @@
             }
 
             // Zkontrolovat, zda odstavec již existuje
-            let paragraph = outputArea.children[currentP];
+            let paragraphId = `p_${currentTextId}_${currentP}`;
+            let paragraph = document.getElementById(paragraphId);
             if (!paragraph) {
               paragraph = document.createElement("div");
               paragraph.className = "paragraph";
-              outputArea.appendChild(paragraph);
+              paragraph.id = paragraphId;
+              textContainer.appendChild(paragraph);
             }
 
             // Zkontrolovat, zda řádek již existuje
-            let row = paragraph.children[currentR];
+            let rowId = `r_${currentTextId}_${currentP}_${currentR}`;
+            let row = document.getElementById(rowId);
             if (!row) {
               row = document.createElement("div");
               row.className = "word-row";
+              row.id = rowId;
               paragraph.appendChild(row);
             }
 
@@ -267,11 +632,120 @@
           }
         }
 
+        // Funkce pro přidání slov do struktury v odstavcovém režimu
+        function addWordsToStructureParagraph(words) {
+          let wordIndex = 0;
+          const textContainer = document.getElementById(currentTextId);
+
+          while (wordIndex < words.length && addedWords < totalWords) {
+            // Najít aktuální pozici ve struktuře
+            let currentP = 0;
+            let wordsInCurrentP = 0;
+            let wordCount = 0;
+
+            // Projít strukturu, dokud nenajdeme správné místo pro další slovo
+            for (let p = 0; p < structure.length; p++) {
+              if (wordCount + structure[p] > addedWords) {
+                currentP = p;
+                wordsInCurrentP = structure[p];
+                break;
+              }
+              wordCount += structure[p];
+            }
+
+            // Zkontrolovat, zda odstavec již existuje
+            let paragraphId = `p_${currentTextId}_${currentP}`;
+            let paragraph = document.getElementById(paragraphId);
+            if (!paragraph) {
+              paragraph = document.createElement("div");
+              paragraph.className = "paragraph";
+              paragraph.id = paragraphId;
+              textContainer.appendChild(paragraph);
+            }
+
+            // Kolik slov můžeme přidat do aktuálního odstavce
+            const remainingInParagraph =
+              wordsInCurrentP - (addedWords - wordCount);
+            const wordsToAdd = Math.min(
+              words.length - wordIndex,
+              remainingInParagraph
+            );
+
+            // Přidat slova do odstavce
+            for (let i = 0; i < wordsToAdd; i++) {
+              if (paragraph.textContent === "") {
+                paragraph.textContent = words[wordIndex];
+              } else {
+                paragraph.textContent += " " + words[wordIndex];
+              }
+              wordIndex++;
+              addedWords++;
+            }
+          }
+        }
+
         // Funkce pro aktualizaci postupu
         function updateProgress() {
           const percentage = Math.floor((addedWords / totalWords) * 100);
           progressText.textContent = `${percentage}%`;
           progressFill.style.width = `${percentage}%`;
+        }
+
+        // Funkce pro uložení aktuálního textu
+        function saveCurrentText() {
+          let savedTexts = JSON.parse(
+            localStorage.getItem("savedTexts") || "{}"
+          );
+
+          // Uložit informace o aktuálním textu
+          savedTexts[currentTextId] = {
+            mode: currentMode,
+            structure: structure,
+            addedWords: addedWords,
+            totalWords: totalWords,
+            html: document.getElementById(currentTextId).innerHTML,
+            timestamp: new Date().toLocaleString(),
+          };
+
+          // Uložit do localStorage
+          localStorage.setItem("savedTexts", JSON.stringify(savedTexts));
+
+          // Uložit aktuální stav
+          saveCurrentState();
+
+          // Pokud je text dokončen, vytvořit nový při příštím načtení
+          if (addedWords >= totalWords) {
+            // Vynulovat stav, aby se při příštím načtení vytvořil nový text
+            localStorage.removeItem(`currentTextId_${currentMode}`);
+          }
+        }
+
+        // Funkce pro načtení uložených textů
+        function loadSavedTexts() {
+          const savedTexts = JSON.parse(
+            localStorage.getItem("savedTexts") || "{}"
+          );
+
+          // Seřadit texty podle ID (což obsahuje timestamp)
+          const sortedTextIds = Object.keys(savedTexts).sort((a, b) => {
+            const timeA = parseInt(a.split("_")[1]);
+            const timeB = parseInt(b.split("_")[1]);
+            return timeB - timeA; // Seřadit sestupně (nejnovější první)
+          });
+
+          // Načíst a zobrazit uložené texty
+          for (const textId of sortedTextIds) {
+            const text = savedTexts[textId];
+
+            // Vytvořit kontejner pro text
+            const textContainer = document.createElement("div");
+            textContainer.className = "text-container";
+            textContainer.id = textId;
+            textContainer.innerHTML = text.html;
+
+            // Přidat do výstupu
+            outputArea.appendChild(textContainer);
+          }
         }
 
         // Pomocná funkce pro získání náhodného celého čísla v rozsahu
